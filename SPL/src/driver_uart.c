@@ -9,7 +9,7 @@ void UART1_Init_A9A10(uint16_t baudrate)
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | RCC_APB2Periph_GPIOA, ENABLE);
 
   USART_InitTypeDef USART_InitStructure;
-  USART_InitStructure.USART_BaudRate = 19200;
+  USART_InitStructure.USART_BaudRate = 9600;
   USART_InitStructure.USART_WordLength = USART_WordLength_8b;
   USART_InitStructure.USART_StopBits = USART_StopBits_1;
   USART_InitStructure.USART_Parity = USART_Parity_No;

@@ -18,10 +18,11 @@
 #include <string.h>
 
 #define BUTTON_PAIR         GPIO_Pin_0
-#define LED_OFF()           GPIO_SetBits(GPIOC, GPIO_Pin_13)
-#define LED_ON()            GPIO_ResetBits(GPIOC, GPIO_Pin_13)
+#define LED_OFF()           GPIO_SetBits(GPIOA, GPIO_Pin_6)
+#define LED_ON()            GPIO_ResetBits(GPIOA, GPIO_Pin_6)
 
-
+#define RF_CS_PIN                 GPIO_Pin_7
+#define RF_SET_PIN                GPIO_Pin_8
 
 #define STM32_UUID          ((uint32_t *)0x1FFFF7E8)
 
@@ -100,6 +101,11 @@ void Gpio_Init(void)
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
     GPIO_Init_Structure.GPIO_Mode  = GPIO_Mode_IPU;
     GPIO_Init_Structure.GPIO_Pin   = GPIO_Pin_0;
+    GPIO_Init_Structure.GPIO_Speed = GPIO_Speed_10MHz;
+    GPIO_Init(GPIOA, &GPIO_Init_Structure);
+
+    GPIO_Init_Structure.GPIO_Mode  = GPIO_Mode_Out_PP;
+    GPIO_Init_Structure.GPIO_Pin   = GPIO_Pin_6|RF_CS_PIN|RF_SET_PIN;
     GPIO_Init_Structure.GPIO_Speed = GPIO_Speed_10MHz;
     GPIO_Init(GPIOA, &GPIO_Init_Structure);
 }
@@ -188,6 +194,7 @@ void Send_Packet(packet *data)
   */
 void Task_Pair_Connect(void)
 {
+    LED_ON();
     packet data;
     Button_Detect_Event(GPIOA, BUTTON_PAIR, &status_pair);
     while(status_pair == true)
@@ -198,8 +205,8 @@ void Task_Pair_Connect(void)
         strcpy(data.data, "pair");
         Send_Packet(&data);
         status_pair = false;
-        printf(".pair, ")
     }
+    LED_OFF();
 }
 
 int main(void)
@@ -208,9 +215,11 @@ int main(void)
     Timer_Init();
     Gpio_Init();
 
-    UART1_Init_A9A10(19200);
-    UART3_Config(115200);
+    UART1_Init_A9A10(9600);
+    UART3_Config(9600);
     LED_OFF();
+    GPIO_SetBits(GPIOA, RF_SET_PIN);
+    GPIO_ResetBits(GPIOA, RF_CS_PIN);
     while(1)
     {
         Task_Pair_Connect();
