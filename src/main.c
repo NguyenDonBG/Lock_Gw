@@ -122,7 +122,7 @@ void Button_Detect_Event(GPIO_TypeDef* GPIOx, uint16_t GPIO_Pin, bool *status)
         status_button = true;
     }
 
-    else if(GPIO_ReadInputDataBit(GPIOx, GPIO_Pin) == 0 && status_button == true)
+    if(GPIO_ReadInputDataBit(GPIOx, GPIO_Pin) == 0 && status_button == true)
     {
         status_button = false;
         *status = true;
@@ -216,29 +216,39 @@ int main(void)
     Gpio_Init();
 
     UART1_Init_A9A10(9600);
-    UART3_Config(9600);
+    UART3_Config(115200);
     LED_OFF();
     GPIO_SetBits(GPIOA, RF_SET_PIN);
     GPIO_ResetBits(GPIOA, RF_CS_PIN);
+    char type[5];
+    char ID_get_way[7];
+    char ID_node[7];
+    char mess[5];
+    char ID_GW[7];
+    char send_esp[30];
+    sprintf(ID_GW, "%x", STM32_UUID[0]&0xFFFFFF);
     while(1)
     {
         Task_Pair_Connect();
         if(slot_rx_time == 10 && sync_status == false)
         {
-            printf("sync\n");
+            printf("sync,%x,TX1,true\n", STM32_UUID[0]&0xFFFFFF);
             sync_status = true;
             slot_rx_time = 0;
         }
 
         if(slot_rx_time == 1 && tx1_status == false)
         {
-            UART_PutStr(USART3, "TX1: ");
-            UART_PutStr(USART3, uart1_rx);
-            tx1_status = true;
-            memset(uart1_rx, 0 , sizeof(uart1_rx));
+            Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
+            if(strstr(type, "lock") != NULL && strstr(ID_get_way,ID_GW) != NULL)
+            {
+                sprintf(send_esp, ".%s,%s,%s,%s,\n",type, ID_get_way, ID_node, mess);
+                UART_PutStr(USART3, send_esp);
+                tx1_status = true;
+                memset(uart1_rx, 0 , sizeof(uart1_rx));
+            }
         }
-//
-//
+
         if(slot_rx_time == 3 &&  tx2_status == false)
         {
           //  printf("ctrl,%x,TX1,open,\n", STM32_UUID[0]&0xFFFFFF);
@@ -248,10 +258,15 @@ int main(void)
 
         if(slot_rx_time == 5 &&  ping_status == false)
         {
-            ping_status = true;
-            UART_PutStr(USART3, "PING: ");
-            UART_PutStr(USART3, uart1_rx);
-            memset(uart1_rx, 0 , sizeof(uart1_rx));
+
+            Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
+            if(strstr(type, "ping") != NULL && strstr(ID_get_way,ID_GW) != NULL)
+            {
+                sprintf(send_esp, ".%s,%s,%s,%s,\n",type, ID_get_way, ID_node, mess);
+                UART_PutStr(USART3, send_esp);
+                 ping_status = true;
+                memset(uart1_rx, 0 , sizeof(uart1_rx));
+            }
 
         }
     }
