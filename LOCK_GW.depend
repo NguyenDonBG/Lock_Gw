@@ -472,7 +472,7 @@
 1629449618 source:d:\donnv\lock\lock_gw\src\system_stm32f10x.c
 	"stm32f10x.h"
 
-1633861713 source:d:\donnv\lock\lock_gw\src\main.c
+1634006248 source:d:\donnv\lock\lock_gw\src\main.c
 	"stm32f10x_conf.h"
 	"driver_uart.h"
 	"delay.h"

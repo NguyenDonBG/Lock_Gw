@@ -242,7 +242,7 @@ int main(void)
             Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
             if(strstr(type, "lock") != NULL && strstr(ID_get_way,ID_GW) != NULL)
             {
-                sprintf(send_esp, ".%s,%s,%s,%s,\n",type, ID_get_way, ID_node, mess);
+                sprintf(send_esp, ",%s,%s,%s,%s.\n",type, ID_get_way, ID_node, mess);
                 UART_PutStr(USART3, send_esp);
                 tx1_status = true;
                 memset(uart1_rx, 0 , sizeof(uart1_rx));
@@ -262,7 +262,7 @@ int main(void)
             Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
             if(strstr(type, "ping") != NULL && strstr(ID_get_way,ID_GW) != NULL)
             {
-                sprintf(send_esp, ".%s,%s,%s,%s,\n",type, ID_get_way, ID_node, mess);
+                sprintf(send_esp, ",%s,%s,%s,%s.\n",type, ID_get_way, ID_node, mess);
                 UART_PutStr(USART3, send_esp);
                  ping_status = true;
                 memset(uart1_rx, 0 , sizeof(uart1_rx));
