@@ -31,59 +31,10 @@ bool status_pair = false;
 volatile uint8_t slot_rx_time = 0;
 volatile uint8_t sync_send_time = 0;
 volatile bool sync_status = 0;
-volatile bool tx1_status = 0;
-volatile bool tx2_status = 0;
-volatile bool ping_status = 0;
 
-extern char Rx_bufArr[64];
-extern char uart1_rx[64];
+extern char Rx_bufArr[20];
+extern char uart1_rx[20];
 
-typedef struct{
-    char type[5];
-    char UID[18];
-    char id_node[4];
-    char data[4];
-}packet;
-
-
-void Timer_Init(void)
-{
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-    TIM_TimeBaseInitTypeDef   Timer_InitStructure;
-    Timer_InitStructure.TIM_Prescaler   = 7200 - 1;
-    Timer_InitStructure.TIM_Period      = 10000 - 1;
-    Timer_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseInit(TIM2, &Timer_InitStructure);
-    TIM_ClearFlag(TIM2, TIM_FLAG_Update);
-    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-    TIM_Cmd(TIM2, ENABLE);
-
-    NVIC_InitTypeDef        NVIC_InitStructure;
-    NVIC_InitStructure.NVIC_IRQChannel    = TIM2_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelCmd  = ENABLE;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-    NVIC_Init(&NVIC_InitStructure);
-}
-
-void TIM2_IRQHandler(void)
-{
-    if(TIM_GetFlagStatus(TIM2, TIM_IT_Update) != RESET)
-    {
-        slot_rx_time++;
-        sync_send_time++;
-        if(slot_rx_time == 1) tx1_status = false;
-        if(slot_rx_time == 3) tx2_status = false;
-        if(slot_rx_time == 5) ping_status = false;;
-        if(slot_rx_time > 10)
-        {
-            sync_status = false;
-            slot_rx_time = 0;
-
-        }
-        TIM_ClearFlag(TIM2, TIM_FLAG_Update);
-    }
-}
 /**
   * @brief  Gpio_Init config gpio
   * @param
@@ -178,15 +129,7 @@ bool Process_Message(char *str, char *type, char *ID_get_way, char *ID_node, cha
         return false;
     }
 }
-/**
-  * @brief
-  * @param
-  * @retval
-  */
-void Send_Packet(packet *data)
-{
-    printf("%s,%s,%s,%s,\n",data->type, data->UID, data->id_node,data->data);
-}
+
 /**
   * @brief
   * @param
@@ -194,79 +137,62 @@ void Send_Packet(packet *data)
   */
 void Task_Pair_Connect(void)
 {
-    LED_ON();
-    packet data;
     Button_Detect_Event(GPIOA, BUTTON_PAIR, &status_pair);
     while(status_pair == true)
     {
-        strcpy(data.type, "pair");
-        sprintf(data.UID, "%x", STM32_UUID[0]&0xFFFFFF);
-        strcpy(data.id_node, "TX1");
-        strcpy(data.data, "pair");
-        Send_Packet(&data);
-        status_pair = false;
+         LED_OFF();
+         printf("pa,%x,1,1,\r\n",STM32_UUID[0]&0xFFFF);
+         status_pair = false;
     }
-    LED_OFF();
+    LED_ON();
 }
 
 int main(void)
 {
-    SysTick_Init();
-    Timer_Init();
     Gpio_Init();
 
-    UART1_Init_A9A10(9600);
+    UART1_Init_A9A10(1200);
     UART3_Config(115200);
-    LED_OFF();
+    LED_ON();
     GPIO_SetBits(GPIOA, RF_SET_PIN);
     GPIO_ResetBits(GPIOA, RF_CS_PIN);
     char type[5];
     char ID_get_way[7];
     char ID_node[7];
     char mess[5];
-    char ID_GW[7];
-    char send_esp[30];
-    sprintf(ID_GW, "%x", STM32_UUID[0]&0xFFFFFF);
+    char ID_GW[5];
+    sprintf(ID_GW, "%x", STM32_UUID[0]&0xFFFF);
     while(1)
     {
+        memset(type, 0, sizeof(type));
+        memset(ID_get_way, 0, sizeof(ID_get_way));
+        memset(ID_node, 0, sizeof(ID_node));
+        memset(mess, 0, sizeof(mess));
+        memset(uart1_rx, 0 , sizeof(uart1_rx));
         Task_Pair_Connect();
-        if(slot_rx_time == 10 && sync_status == false)
+        if(strlen(Rx_bufArr) > 0)
         {
-            printf("sync,%x,TX1,true\n", STM32_UUID[0]&0xFFFFFF);
-            sync_status = true;
-            slot_rx_time = 0;
-        }
-
-        if(slot_rx_time == 1 && tx1_status == false)
-        {
-            Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
-            if(strstr(type, "lock") != NULL && strstr(ID_get_way,ID_GW) != NULL)
+            while(strchr(Rx_bufArr, '\n') == NULL);
+            Process_Message(Rx_bufArr, type, ID_get_way, ID_node, mess);
+            if(strstr(type, "ct") != NULL && strchr(ID_node, '1') != NULL && strchr(mess, '1') != NULL)
             {
-                sprintf(send_esp, ",%s,%s,%s,%s.\n",type, ID_get_way, ID_node, mess);
-                UART_PutStr(USART3, send_esp);
-                tx1_status = true;
-                memset(uart1_rx, 0 , sizeof(uart1_rx));
+                printf("ct,%x,1,1,\n", STM32_UUID[0]&0xFFFF);
             }
+            memset(Rx_bufArr, 0, sizeof(Rx_bufArr));
         }
 
-        if(slot_rx_time == 3 &&  tx2_status == false)
+        if(strlen(uart1_rx) != 0)
         {
-          //  printf("ctrl,%x,TX1,open,\n", STM32_UUID[0]&0xFFFFFF);
-            UART_PutStr(USART3, "TX2: ");
-            tx2_status = true;
-        }
-
-        if(slot_rx_time == 5 &&  ping_status == false)
-        {
-
-            Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
-            if(strstr(type, "ping") != NULL && strstr(ID_get_way,ID_GW) != NULL)
+           // UART_PutStr(USART3, uart1_rx);
+            while(strstr(uart1_rx, "\n") == NULL);
+            Process_Message(Rx_bufArr, type, ID_get_way, ID_node, mess);
+            if(strstr(ID_GW, ID_get_way) != NULL)
             {
-                sprintf(send_esp, ",%s,%s,%s,%s.\n",type, ID_get_way, ID_node, mess);
-                UART_PutStr(USART3, send_esp);
-                 ping_status = true;
-                memset(uart1_rx, 0 , sizeof(uart1_rx));
+                UART_PutStr(USART3, uart1_rx);
+                memset(uart1_rx, 0 , strlen(uart1_rx));
             }
+            memset(Rx_bufArr, 0, strlen(Rx_bufArr));
+            memset(ID_get_way, 0, strlen(ID_get_way));
 
         }
     }

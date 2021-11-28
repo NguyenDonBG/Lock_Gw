@@ -13,6 +13,7 @@
 void UART1_Init_A9A10(uint16_t baudrate);
 int _write(int file, char *ptr, int len);
 void USART1_IRQHandler();
+void USART3_IRQHandler();
 void UART3_Config(uint32_t baudrate);
 void UART_SendChar(USART_TypeDef *USARTx, char data);
 void UART_PutStr(USART_TypeDef *USARTx, char *Str);
