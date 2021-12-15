@@ -32,8 +32,8 @@ volatile uint8_t slot_rx_time = 0;
 volatile uint8_t sync_send_time = 0;
 volatile bool sync_status = 0;
 
-extern char Rx_bufArr[20];
-extern char uart1_rx[20];
+extern char Rx_bufArr[64];
+extern char uart1_rx[64];
 
 /**
   * @brief  Gpio_Init config gpio
@@ -99,8 +99,17 @@ bool Process_Message(char *str, char *type, char *ID_get_way, char *ID_node, cha
         if(p_rx != NULL)
         {
             *p_rx = 0;
+            //strcpy(type,p_type);
+        }
+
+        p_type = p_rx+1;
+        p_rx = strchr(p_type,',');
+        if(p_rx != NULL)
+        {
+            *p_rx = 0;
             strcpy(type,p_type);
         }
+
         p_id_getway = p_rx+1;
         p_rx = strchr(p_id_getway,',');
         if(p_rx != NULL)
@@ -146,7 +155,61 @@ void Task_Pair_Connect(void)
     }
     LED_ON();
 }
+#define LsiFreq (40000)
+void IWD_Init(float time_out)
+{
+  uint16_t PrescalerCode;
+  uint16_t Prescaler;
+  uint16_t ReloadValue;
 
+	if( (time_out *LsiFreq)/4 <= 4000)
+	{
+		PrescalerCode = 0x00;
+		Prescaler = 4;
+	}
+	else if((time_out *LsiFreq)/8 <= 4000)
+	{
+		PrescalerCode = 0x01;
+		Prescaler = 8;
+	}
+	else if((time_out *LsiFreq)/16 <= 4000)
+	{
+		PrescalerCode = 0x02;
+		Prescaler = 16;
+	}
+	else if((time_out *LsiFreq)/32 <= 4000)
+	{
+		PrescalerCode = 0x03;
+		Prescaler = 32;
+	}
+	else if((time_out *LsiFreq)/64 <= 4000)
+	{
+		PrescalerCode = 0x04;
+		Prescaler = 64;
+	}
+	else if((time_out *LsiFreq)/128 <= 4000)
+	{
+		PrescalerCode = 0x05;
+		Prescaler = 128;
+	}
+	else if((time_out *LsiFreq)/256 <= 4000)
+	{
+		PrescalerCode = 0x06;
+		Prescaler = 256;
+	}
+
+	ReloadValue = (uint32_t)((time_out * LsiFreq)/Prescaler);
+	IWDG->KR = 0x5555;
+    IWDG->PR =  PrescalerCode;
+    IWDG->RLR = ReloadValue;
+    IWDG->KR = 0xAAAA;
+    IWDG->KR = 0xCCCC;
+}
+
+void IWD_Clear_Time_Out()
+{
+	 IWDG->KR = 0xAAAA;
+}
 int main(void)
 {
     Gpio_Init();
@@ -162,13 +225,16 @@ int main(void)
     char mess[5];
     char ID_GW[5];
     sprintf(ID_GW, "%x", STM32_UUID[0]&0xFFFF);
+
+    IWD_Init(9.8);
     while(1)
     {
+        IWD_Clear_Time_Out();
         memset(type, 0, sizeof(type));
         memset(ID_get_way, 0, sizeof(ID_get_way));
         memset(ID_node, 0, sizeof(ID_node));
         memset(mess, 0, sizeof(mess));
-        memset(uart1_rx, 0 , sizeof(uart1_rx));
+
         Task_Pair_Connect();
         if(strlen(Rx_bufArr) > 0)
         {
@@ -180,20 +246,18 @@ int main(void)
             }
             memset(Rx_bufArr, 0, sizeof(Rx_bufArr));
         }
-
-        if(strlen(uart1_rx) != 0)
+        while(strlen(uart1_rx) != 0)
         {
-           // UART_PutStr(USART3, uart1_rx);
-            while(strstr(uart1_rx, "\n") == NULL);
-            Process_Message(Rx_bufArr, type, ID_get_way, ID_node, mess);
+            while(strchr(uart1_rx, '\n') == NULL);
+            Process_Message(uart1_rx, type, ID_get_way, ID_node, mess);
             if(strstr(ID_GW, ID_get_way) != NULL)
             {
                 UART_PutStr(USART3, uart1_rx);
                 memset(uart1_rx, 0 , strlen(uart1_rx));
             }
+            memset(uart1_rx, 0 , strlen(uart1_rx));
             memset(Rx_bufArr, 0, strlen(Rx_bufArr));
             memset(ID_get_way, 0, strlen(ID_get_way));
-
         }
     }
 }
